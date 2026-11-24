@@ -16,29 +16,40 @@ pio device monitor -e robocar # 115200 baud log
 
 ## Layout
 
+Interfaces (`.h`) for both firmwares live in `include/`, implementations
+(`.cpp`) in `src/robocar/` or `src/remote/`. PlatformIO adds `include/` to the
+search path, so the code includes headers by name (`#include "Motor.h"`).
+
 ```
 lib/RoboProtocol/     packet formats, CRC, car states        (shared)
 lib/EspNowTransport/  ESP-NOW wrapper (Arduino-ESP32 2.x/3.x) (shared)
 lib/BatteryMonitor/   ADC + divider battery voltage          (shared)
-src/robocar/
+
+Robocar                  include/ (.h)  +  src/robocar/ (.cpp)
   CarConfig.h            pins, geometry, PID, safety limits  <- edit this
-  Motor.h/.cpp           one TB6612FNG channel (LEDC PWM 20 kHz)
-  Encoder.h/.cpp         quadrature decoding in the PCNT peripheral (x4)
-  Pid.h/.cpp             PID with anti-windup
-  WheelController.h/.cpp feed-forward + PID, accel ramp, stall detection
-  MecanumKinematics.h/.cpp  mixing and forward kinematics
-  MecanumDrive.h/.cpp    4 wheels + STBY + odometry
-  CarLink.h/.cpp         ESP-NOW: control in, telemetry out, pairing
-  StatusLed.h/.cpp       RGB LED patterns
-  RoboCar.h/.cpp         state machine, scheduling, telemetry
-src/remote/
+  Motor                  one TB6612FNG channel (LEDC PWM 20 kHz)
+  Encoder                quadrature decoding in the PCNT peripheral (x4)
+  Pid                    PID with anti-windup
+  WheelController        feed-forward + PID, accel ramp, stall detection
+  MecanumKinematics      mixing and forward kinematics
+  MecanumDrive           4 wheels + STBY + odometry
+  CarLink                ESP-NOW: control in, telemetry out, pairing
+  StatusLed              RGB LED patterns
+  RoboCar                state machine, scheduling, telemetry
+  main.cpp
+
+Remote                   include/ (.h)  +  src/remote/ (.cpp)
   RemoteConfig.h         pins, joystick tuning, gears        <- edit this
-  Joystick.h/.cpp        centre calibration, dead zone, expo
-  Button.h/.cpp          debounced buttons
-  RemoteLink.h/.cpp      ESP-NOW: control out, telemetry in
-  Display.h/.cpp         sprite-based UI
-  RemoteApp.h/.cpp       controls, arming logic, scheduling
+  Joystick               centre calibration, dead zone, expo
+  Button                 debounced buttons
+  RemoteLink             ESP-NOW: control out, telemetry in
+  Display                sprite-based UI
+  RemoteApp              controls, arming logic, scheduling
+  main.cpp
 ```
+
+The shared libraries keep their headers in `lib/<name>/src/`. PlatformIO only
+compiles a library when it finds the library's own headers there.
 
 ## Car wiring (YD-ESP32-S3)
 
