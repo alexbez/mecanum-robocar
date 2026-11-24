@@ -125,6 +125,79 @@ The joystick and LCD are already wired on the board. GPIO15 (LCD power) is switc
 | BOOT button (GPIO0) | arm / disarm. Arming needs a live link and a centred stick |
 | KEY button (GPIO14) | speed gear 30 → 60 → 100 % |
 
+## Remote display
+
+The screen is 320 × 170 pixels in landscape (USB-C on the right) and refreshes 20 times a second. The car sends telemetry 10 times a second.
+
+```
++----------------------------------------------------------------+
+| [ DRIVING ]                            RX 10Hz    REM 4.05V    |  <- header
+|                                                                 |
+| CAR BATTERY                     | FL           55 | FR       55 |
+| 11.84 V                         |      52.3       |     52.1    |
+|                                 |  [    |=====  ] |  [  |===== ]|
+| SPEED        ODOMETER           +-----------------+-------------+
+| 0.18 m/s     12.4 m             | RL           55 | RR       55 |
+|                                 |      51.9       |     52.4    |
+| [ DRIVE    60% ]  (o)           |  [    |=====  ] |  [  |===== ]|
+| [     ARMED     ]               |                 |             |
++----------------------------------------------------------------+
+```
+
+### Header (top bar)
+
+| Item | Meaning |
+|---|---|
+| State box (left) | The car's state, in the same colours as the car's RGB LED: `WAITING` blue, `DISARMED` amber, `ARMED` green, `DRIVING` cyan, `LINK LOST` red, `LOW BATT` orange, `FAULT` magenta. Before the first telemetry arrives it shows `SEARCHING CAR` (blue). If telemetry stops for more than 600 ms it shows `NO SIGNAL` (blinking red). |
+| `RX nnHz` | Telemetry packets received from the car per second. About 10 is normal. Green while the link is alive, red when it is not. |
+| `REM x.xxV` | The remote's own battery voltage. Turns orange below 3.5 V. On USB power it shows the charger voltage instead. |
+
+### Left panel
+
+| Item | Meaning |
+|---|---|
+| `CAR BATTERY` | Battery voltage measured on the car. Green when OK, orange below the warning level (10.5 V), red when the car has cut the motors for low battery (below 9.9 V). Shows `--.-- V` if there is no reading (no telemetry yet, or battery sensing not wired). |
+| `SPEED` | How fast the car actually moves, in m/s, calculated from the wheel encoders (includes sideways motion). |
+| `ODOMETER` | Total distance driven since the car was switched on, in metres. |
+| Mode box | `DRIVE` (cyan): stick left/right turns the car. `STRAFE` (yellow): stick left/right slides it sideways. The percentage is the speed gear. |
+| Circle | The joystick position as the remote reads it, after dead zone and expo. The dot is red while armed, white otherwise. Useful to check that the stick is centred before arming. |
+| Arm box | `ARMED` (red) when the motors can run. `SAFE` (grey) when disarmed. `SAFE - press ARM` means the car reports it needs a disarm before it will accept arming again. It shows briefly after the link comes back, and stays on while the car is in `LOW BATT`. |
+
+### Wheel panels (right side)
+
+Four panels arranged as the wheels sit on the car (FL, FR / RL, RR, seen from above).
+
+| Item | Meaning |
+|---|---|
+| Name (top left) | `FL`, `FR`, `RL`, `RR`. Replaced by `STALL` with a magenta border when that wheel tripped the stall/encoder check. |
+| Small number (top right) | Target wheel speed in rpm that the speed controller is aiming for. |
+| Big number | Measured wheel speed in rpm, from the encoder. |
+| Bar | Motor power (PWM duty). Grows right from the centre line for forward, left for reverse. Green normally, orange above 90 %: that motor is at its limit (heavy load or a low battery). |
+
+### Greyed-out values
+
+When the link is lost, the panels keep the last values received but draw them in grey, so it's clear they are not live.
+
+### Pop-up messages
+
+A message appears in the middle of the screen for 1.5 s:
+
+| Message | When |
+|---|---|
+| `ARMED` / `DISARMED` | after pressing the BOOT button |
+| `DRIVE: stick X turns` / `STRAFE: stick X slides` | after pressing the joystick |
+| `NO LINK TO CAR` | arming refused: no telemetry from the car |
+| `CENTRE THE STICK` | arming refused: the joystick is not centred |
+| `CAR BATTERY LOW` | arming refused: the car is in low-battery state |
+| `LINK LOST - DISARMED` | the remote disarmed itself because telemetry stopped |
+| `WHEEL STALL - DISARMED` | the car reported a stalled wheel or encoder fault |
+| `LOW BATTERY - DISARMED` | the car's battery fell below the critical level |
+| `CAR NOT READY - REARM` | the car rejected arming (e.g. after a reboot); press ARM again |
+
+### At power-up
+
+The remote shows `MECANUM REMOTE / release the joystick...` for a moment while it measures the joystick's centre position, so don't touch the stick while switching it on. `RADIO ERROR` means ESP-NOW failed to start; restart the remote.
+
 ## Car RGB LED
 
 | Colour | State |
