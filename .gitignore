@@ -1,3 +1,5 @@
 .pio/
 .vscode/
 .DS_Store
+hardware/remote-case/ref/
+__pycache__/

@@ -127,7 +127,7 @@ The joystick and LCD are already wired on the board. GPIO15 (LCD power) is switc
 
 ## Remote display
 
-The screen is 320 × 170 pixels in landscape (USB-C on the right) and refreshes 20 times a second. The car sends telemetry 10 times a second.
+The screen is 320 × 170 pixels in landscape (USB-C on the left, as the board sits in the printed case) and refreshes 20 times a second. The car sends telemetry 10 times a second.
 
 ```
 +----------------------------------------------------------------+

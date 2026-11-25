@@ -29,7 +29,9 @@ void Display::begin(uint8_t lcdPowerPin) {
   digitalWrite(lcdPowerPin, HIGH);
 
   tft_.init();
-  tft_.setRotation(1);  // landscape, USB-C on the right
+  // Landscape with USB-C on the LEFT, as the board sits in the printed case
+  // (hardware/remote-case). Use 1 for USB-C on the right.
+  tft_.setRotation(3);
   tft_.fillScreen(kBg);
 #ifdef TFT_BL
   pinMode(TFT_BL, OUTPUT);
