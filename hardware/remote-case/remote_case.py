@@ -46,9 +46,9 @@ REF_STEP = os.path.join(HERE, "ref", "t-display-s3-full.stp")
 P = dict(
     # --- printing / fit (Bambu Lab, 0.4 mm nozzle, PLA/PETG) ---
     fit=0.3,           # clearance around boards
-    wall=2.0,          # side walls
+    wall=2.0,          # side walls (2.6 with joint="skirt")
     face=2.0,          # front face thickness
-    floor=2.0,         # back cover thickness
+    floor=2.5,         # back cover thickness
     corner_r=6.0,      # vertical corner radius
     edge_r=1.2,        # rounding of the outer front/back edges
 
@@ -103,15 +103,28 @@ P = dict(
     js_hole_d_face=24.0,                  # stick opening in the front face
     js_cap_d=26.0, js_cap_h=9.0, js_cap_z=17.0,  # cap diameter, height, bottom above PCB top
 
-    # --- screws ---
-    screw_pilot_d=2.6, screw_clear_d=3.4, screw_head_d=6.2, screw_head_h=3.0,
-    boss_d=7.0, boss_inset=6.0,
-    js_standoff_d=6.0, js_pilot_d=2.6,
-
     # --- shell joint ---
-    lip_t=1.0, lip_h=2.0, lip_gap=0.2,
+    # "flat":  deep front shell, flat back plate with a short locating rim
+    # "skirt": shallow tray as back cover; its outer wall rises past the split and
+    #          wraps round the bottom of the front shell, which is stepped in for it
+    joint=os.environ.get("JOINT", "flat"),
+    rim_t=1.2, rim_h=2.0, rim_gap=0.2,           # flat: locating rim on the plate
+    skirt_t=1.2, skirt_h=4.0, skirt_gap=0.2,     # skirt
+
+    # --- screws ---
+    # back cover holes print without supports: flat -> 90 deg countersink in the
+    # plate; skirt -> counterbore with a 45 deg cone roof. Countersunk (flat head)
+    # screws sit flush; pan / socket heads also work.
+    screw_len=None,    # case screws, M3; None = shortest that bites >= 8 mm
+    screw_cb=3.0,      # skirt: counterbore depth
+    screw_pilot_d=2.6, screw_clear_d=3.4, screw_head_d=6.4,
+    boss_d=7.0, back_boss_d=10.0, boss_inset=6.5,
+    js_standoff_d=6.0, js_pilot_d=2.6,
 )
 globals().update(P)
+if joint == "skirt":
+    wall = max(wall, skirt_t + skirt_gap + 1.2)
+    screw_head_d = max(screw_head_d, 6.6)
 
 # Thickness: back cover + wiring room under the T-Display + board stack + front face.
 import math
@@ -187,10 +200,18 @@ js_holes = [(js_pcb_cx + sx * js_hole_dx / 2, js_pcb_cy + sy * js_hole_dy / 2)
 # Case length: joystick PCB + room for the header plugs + wall.
 length = js_pcb_cx + js_pcb_l / 2 + (js_header_clear if js_header_side > 0 else 4.0) + wall
 # Back cover top / front shell bottom: below everything mounted in the front shell.
-split_z = min(td_tz - td_back_parts - 1.0, js_pcb_bot - 1.0)
+if joint == "skirt":
+    split_z = min(td_tz - td_back_parts - 1.0, js_pcb_bot - 1.0)
+else:
+    split_z = floor
 
-# Case screws: shortest standard M3 length that bites >= 8 mm into the front shell boss.
-screw_len = next(L for L in (10, 12, 16, 20, 25, 30, 35, 40) if L - (split_z - screw_head_h) >= 8)
+# How far the case screws go into the front shell bosses (screw tip - split).
+_head_z = screw_cb if joint == "skirt" else 0.0
+if screw_len is None:
+    screw_len = next(L for L in (8, 10, 12, 16, 20, 25, 30) if _head_z + L - split_z >= 8)
+screw_bite = _head_z + screw_len - split_z
+assert 7.0 <= screw_bite <= face_in - 1.0 - split_z, \
+    f"M3x{screw_len} bites {screw_bite:.1f} mm: pick another screw_len"
 
 bosses = [(boss_inset, boss_inset), (boss_inset, width - boss_inset),
           (length - boss_inset, boss_inset), (length - boss_inset, width - boss_inset)]
@@ -204,6 +225,13 @@ def front_shell():
     inner = rounded_box(wall, wall, split_z - 1, length - wall, width - wall, face_in,
                         corner_r - wall)
     shell = outer.cut(inner)
+    if joint == "skirt":
+        # step the outside in at the bottom so the back cover's skirt wraps round it
+        r_in = skirt_t + skirt_gap
+        ring = rounded_box(-1, -1, split_z - 1, length + 1, width + 1, split_z + skirt_h, 0).cut(
+            rounded_box(r_in, r_in, split_z - 2, length - r_in, width - r_in,
+                        split_z + skirt_h + 1, corner_r - r_in))
+        shell = shell.cut(ring)
 
     adds = []
     # screw bosses
@@ -266,34 +294,69 @@ def fuse_cut(shape, cuts):
 # Back cover
 # =============================================================================
 def back_cover():
-    outer = rounded_box(0, 0, 0, length, width, split_z, corner_r)
-    outer = round_edges_at(outer, 0, edge_r)
-    pocket = rounded_box(wall, wall, floor, length - wall, width - wall, split_z + 1,
-                         corner_r - wall)
-    shell = outer.cut(pocket)
-    # lip that slides into the front shell
-    # (slides along the inside of the front shell walls)
-    g = wall + lip_gap
-    lip_o = rounded_box(g, g, split_z - 0.01, length - g, width - g, split_z + lip_h,
-                        corner_r - g)
-    lip_i = rounded_box(g + lip_t, g + lip_t, split_z - 1,
-                        length - g - lip_t, width - g - lip_t, split_z + lip_h + 1,
-                        max(corner_r - g - lip_t, 0.5))
-    adds = [lip_o.cut(lip_i)]
-    for (x, y) in bosses:
-        adds.append(cyl(boss_d, x, y, 0, split_z))
-    # posts pressing the T-Display PCB against the front face
+    return back_plate() if joint == "flat" else back_tray()
+
+
+def press_posts():
+    """Posts pressing the T-Display PCB against the front face (wide foot for strength)."""
+    out = []
     for (px, py) in td_press_points:
         c = b2c(px, py)
-        adds.append(cyl(4.0, c.x, c.y, floor - 0.01, td_tz))
-    shell = fuse([shell] + adds)
+        out.append(cyl(4.0, c.x, c.y, floor - 0.01, td_tz))
+        out.append(Part.makeCone(3.5, 2.0, 3.0, V(c.x, c.y, floor - 0.01)))
+    return out
+
+
+def back_plate():
+    """Flat plate with a short rim that locates it inside the front shell walls.
+
+    Printed outside face down: the rim and posts grow straight up from the plate,
+    the screw holes are 90 degree countersinks, so nothing needs supports.
+    """
+    plate = rounded_box(0, 0, 0, length, width, floor, corner_r)
+    plate = round_edges_at(plate, 0, edge_r)
+    g = wall + rim_gap
+    rim = rounded_box(g, g, floor - 0.01, length - g, width - g, floor + rim_h, corner_r - g).cut(
+        rounded_box(g + rim_t, g + rim_t, floor - 1, length - g - rim_t, width - g - rim_t,
+                    floor + rim_h + 1, max(corner_r - g - rim_t, 0.5)))
+    for (x, y) in bosses:   # the front shell bosses sit in the corners
+        rim = rim.cut(cyl(boss_d + 2 * rim_gap, x, y, floor - 1, floor + rim_h + 1))
+    shell = fuse([plate, rim] + press_posts())
     cuts = []
+    csk_h = (screw_head_d - screw_clear_d) / 2           # 90 degree countersink
     for (x, y) in bosses:
-        cuts.append(cyl(screw_clear_d, x, y, -1, split_z + lip_h + 1))
-        cuts.append(cyl(screw_head_d, x, y, -1, screw_head_h))
-    # cut lip away where it would hit the bosses
+        cuts.append(cyl(screw_clear_d, x, y, -1, floor + 1))
+        cuts.append(Part.makeCone(screw_head_d / 2 + 0.1, screw_clear_d / 2, csk_h + 0.1,
+                                  V(x, y, -0.1)))
+    return fuse_cut(shell, cuts)
+
+
+def back_tray():
+    """Tray whose outer wall continues past the split as a skirt round the front shell.
+
+    Printed outside face down: every wall is vertical and the screw holes have
+    45 degree roofs, so nothing needs supports.
+    """
+    outer = rounded_box(0, 0, 0, length, width, split_z + skirt_h - skirt_gap, corner_r)
+    outer = round_edges_at(outer, 0, edge_r)
+    pocket = rounded_box(wall, wall, floor, length - wall, width - wall, split_z + skirt_h + 1,
+                         corner_r - wall)
+    skirt_in = rounded_box(skirt_t, skirt_t, split_z, length - skirt_t, width - skirt_t,
+                           split_z + skirt_h + 1, corner_r - skirt_t)
+    shell = outer.cut(pocket).cut(skirt_in)
+    adds = []
     for (x, y) in bosses:
-        cuts.append(cyl(boss_d + 2 * lip_gap, x, y, split_z, split_z + lip_h + 1))
+        # thick boss, clipped to the inside of the outer wall
+        b = cyl(back_boss_d, x, y, floor - 0.01, split_z)
+        adds.append(b.common(box(skirt_t, skirt_t, 0, length - skirt_t, width - skirt_t, split_z)))
+    shell = fuse([shell] + adds + press_posts())
+    cuts = []
+    cone_h = (screw_head_d - screw_clear_d) / 2           # 45 degree roof
+    for (x, y) in bosses:
+        cuts.append(cyl(screw_clear_d, x, y, -1, split_z + 1))
+        cuts.append(cyl(screw_head_d, x, y, -1, screw_cb))
+        cuts.append(Part.makeCone(screw_head_d / 2, screw_clear_d / 2, cone_h,
+                                  V(x, y, screw_cb - 0.001)))
     return fuse_cut(shell, cuts)
 
 
@@ -351,7 +414,7 @@ def joystick_model():
     cap = cyl(js_cap_d, js_cx, js_cy, js_pcb_top + js_cap_z, js_pcb_top + js_cap_z + js_cap_h)
     # right-angle header + Dupont plugs, lying in the PCB plane
     hx = js_pcb_cx + js_header_side * (js_pcb_l / 2)
-    hx2 = hx + js_header_side * (js_header_clear - lip_t - lip_gap - 0.8)
+    hx2 = hx + js_header_side * (js_header_clear - 0.8)
     header = box(min(hx, hx2), js_pcb_cy - 6.5, js_pcb_bot - 1.0,
                  max(hx, hx2), js_pcb_cy + 6.5, js_pcb_top + 2.6)
     return pcb, fuse([body, shaft, cap]), header
@@ -403,8 +466,9 @@ def main():
     ok &= check_solid("back", back)
     ok &= check_solid("cap", cap_print)
 
+    print(f"joint: {joint}")
     print(f"case: {length:.1f} x {width:.1f} x {height:.1f} mm, split at Z={split_z:.2f}")
-    print(f"case screws: 4x M3x{screw_len} (bite {screw_len - (split_z - screw_head_h):.1f} mm)")
+    print(f"case screws: 4x M3x{screw_len}, {'countersunk' if joint == 'flat' else 'head recess %.1f mm' % screw_cb}, bite {screw_bite:.1f} mm")
     print(f"wiring room under the T-Display: {td_tz - floor:.1f} mm "
           f"(plugs end {td_pin_spacer + td_plug_l:.1f} mm from the PCB)")
 
