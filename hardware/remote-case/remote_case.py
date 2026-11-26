@@ -86,7 +86,7 @@ P = dict(
     usb_open_w=13.0, usb_open_h=7.5,
 
     # --- button caps ---
-    cap_d=3.2, cap_hole_d=3.7, cap_proud=1.0, cap_gap=0.2,
+    cap_d=3.2, cap_hole_d=3.7, cap_proud=4.0, cap_gap=0.2,
     cap_flange=(6.0, 3.4, 0.0),           # foot size: along board x, along board y
 
     # --- KY-023 joystick ---
