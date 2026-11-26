@@ -16,8 +16,9 @@ Parts (all exported to out/):
                          (print outside face down)
   remote_button_cap.stl  plunger extension for BOOT / KEY (print 2)
 
-Assembly: 4x M3x16 screws from the back into the front shell (self-tapping
-into the printed pilot holes), 4x M3x6 to hold the joystick.
+Assembly: 4x M3 screws from the back into the front shell (self-tapping
+into the printed pilot holes; the script prints the length), 4x M3x6 to hold
+the joystick.
 
 Run:  /Applications/FreeCAD.app/Contents/Resources/bin/freecadcmd remote_case.py
 
@@ -53,7 +54,7 @@ P = dict(
 
     # --- overall size ---
     width=46.0,        # Y
-    height=23.0,       # Z, total thickness
+                       # Z (thickness) follows from the board stack + wiring room, see below
     js_x=93.0,         # X of the joystick centre (from the left outer edge)
                        # (case length follows from the joystick + header clearance)
 
@@ -66,7 +67,17 @@ P = dict(
     td_buttons=((-9.29, 2.32), (8.81, 2.20)),        # BOOT / KEY plunger centres (x, y)
     td_button_top_z=-3.6,                 # plunger top (board Z)
     td_reset=(13.34, 10.3, 1.25),         # side reset button (x, y, z)
-    td_press_points=((-8.0, 26.0), (8.0, 33.0), (-8.0, 50.0), (4.0, 56.0)),  # bare PCB spots
+    td_press_points=((-7.0, 26.0), (7.0, 33.0), (-7.0, 48.0), (4.0, 56.0)),  # bare PCB spots, clear of the plugs
+
+    # pre-soldered pin headers: two rows of 12 at board x = +-11.43, from y = 24.0, 2.54 pitch,
+    # pins pointing out of the back of the board
+    td_pin_rows=(-11.43, 11.43), td_pin_y0=24.0, td_pin_n=12, td_pin_pitch=2.54,
+    td_pin_spacer=2.5,                    # black plastic spacer on the PCB back
+    td_pin_len=8.5,                       # PCB back -> pin tips
+    td_plug_l=14.0,                       # Dupont female housing length (on top of the spacer)
+    td_wire_clear=20.0,                   # PCB back -> inside of the back cover:
+                                          # spacer + Dupont plug + wire bend. About 12 is
+                                          # enough if the wires are soldered to the pins.
 
     # visible screen opening (1.9" 170x320 active area ~22.7 x 42.6 + margin)
     win_l=46.0, win_w=23.5, win_chamfer=1.2,
@@ -102,6 +113,9 @@ P = dict(
 )
 globals().update(P)
 
+# Thickness: back cover + wiring room under the T-Display + board stack + front face.
+import math
+height = math.ceil((floor + td_wire_clear - td_front_z + face) * 2) / 2
 face_in = height - face               # inside of front face
 
 # T-Display placement: board (x, y, z) -> case (Y, X, Z) = (x + ty, y + tx, -z + tz)
@@ -174,6 +188,9 @@ js_holes = [(js_pcb_cx + sx * js_hole_dx / 2, js_pcb_cy + sy * js_hole_dy / 2)
 length = js_pcb_cx + js_pcb_l / 2 + (js_header_clear if js_header_side > 0 else 4.0) + wall
 # Back cover top / front shell bottom: below everything mounted in the front shell.
 split_z = min(td_tz - td_back_parts - 1.0, js_pcb_bot - 1.0)
+
+# Case screws: shortest standard M3 length that bites >= 8 mm into the front shell boss.
+screw_len = next(L for L in (10, 12, 16, 20, 25, 30, 35, 40) if L - (split_z - screw_head_h) >= 8)
 
 bosses = [(boss_inset, boss_inset), (boss_inset, width - boss_inset),
           (length - boss_inset, boss_inset), (length - boss_inset, width - boss_inset)]
@@ -340,6 +357,20 @@ def joystick_model():
     return pcb, fuse([body, shaft, cap]), header
 
 
+def tdisplay_pins_model():
+    """Pre-soldered headers: spacer + pins, and the Dupont plugs + wire room on them."""
+    y0 = td_pin_y0 - td_pin_pitch / 2
+    y1 = td_pin_y0 + (td_pin_n - 0.5) * td_pin_pitch
+    hw = 1.3                                  # half width of a spacer / plug row
+    pins, plugs = [], []
+    for x in td_pin_rows:
+        a, b = b2c(x - hw, y0, 0), b2c(x + hw, y1, td_pin_spacer)
+        pins.append(box(min(a.x, b.x), min(a.y, b.y), b.z, max(a.x, b.x), max(a.y, b.y), a.z))
+        a, b = b2c(x - hw, y0, td_pin_spacer), b2c(x + hw, y1, td_pin_spacer + td_plug_l)
+        plugs.append(box(min(a.x, b.x), min(a.y, b.y), b.z, max(a.x, b.x), max(a.y, b.y), a.z))
+    return fuse(pins), fuse(plugs)
+
+
 # =============================================================================
 # Build, check, export
 # =============================================================================
@@ -373,10 +404,14 @@ def main():
     ok &= check_solid("cap", cap_print)
 
     print(f"case: {length:.1f} x {width:.1f} x {height:.1f} mm, split at Z={split_z:.2f}")
+    print(f"case screws: 4x M3x{screw_len} (bite {screw_len - (split_z - screw_head_h):.1f} mm)")
+    print(f"wiring room under the T-Display: {td_tz - floor:.1f} mm "
+          f"(plugs end {td_pin_spacer + td_plug_l:.1f} mm from the PCB)")
 
     # --- interference checks ---
     td = tdisplay_model()
     js_pcb, js_top, js_hdr = joystick_model()
+    td_pins, td_plugs = tdisplay_pins_model()
     checks = [("front shell vs back cover", front, back)]
     if td is not None:
         checks += [("T-Display vs front shell", td, front),
@@ -386,11 +421,17 @@ def main():
                ("joystick PCB vs back cover", js_pcb, back),
                ("joystick body vs front shell", js_top, front),
                ("joystick header vs back cover", js_hdr, back),
-               ("button caps vs front shell", fuse(caps), front)]
+               ("button caps vs front shell", fuse(caps), front),
+               ("T-Display pins vs front shell", td_pins, front),
+               ("T-Display plugs vs front shell", td_plugs, front),
+               ("T-Display plugs vs back cover", td_plugs, back)]
     for name, a, b in checks:
         v = overlap(a, b)
         flag = "OK" if v < 0.5 else "COLLISION"
         print(f"  {name:32s} overlap {v:8.2f} mm3  {flag}")
+    gap = td_plugs.distToShape(back)[0]
+    print(f"  {'T-Display plugs to back cover':32s} gap     {gap:8.2f} mm   "
+          f"{'OK' if gap >= 0.5 else 'TIGHT'}")
 
     # --- exports ---
     for name, shape in (("remote_case_front", front), ("remote_case_back", back),
@@ -409,7 +450,8 @@ def main():
     items = [(front, grey), (back, dark)] + [(c, (0.9, 0.5, 0.2)) for c in caps]
     if td is not None:
         items.append((td, (0.2, 0.55, 0.3)))
-    items += [(js_pcb, (0.2, 0.3, 0.7)), (js_top, (0.15, 0.15, 0.15))]
+    items += [(js_pcb, (0.2, 0.3, 0.7)), (js_top, (0.15, 0.15, 0.15)),
+              (td_pins, (0.1, 0.1, 0.1)), (td_plugs, (0.55, 0.2, 0.6))]
     render(items, os.path.join(OUT, "preview_assembly.png"),
            views=((35, -60), (-35, -120)), titles=["front", "back"], size=6)
     render([(front, grey)], os.path.join(OUT, "preview_front_inside.png"),

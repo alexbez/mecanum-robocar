@@ -4,7 +4,7 @@ A 3D-printed case for the remote: LilyGo T-Display-S3 on the left, KY-023 joysti
 
 ![assembly preview](out/preview_assembly.png)
 
-Outer size: **130 × 46 × 23 mm**.
+Outer size: **130 × 46 × 30.5 mm**. It is that thick because of the T-Display-S3's pre-soldered pins: there is about 20 mm free behind the board for Dupont plugs and wire bends.
 
 ## Files
 
@@ -25,7 +25,7 @@ cd hardware/remote-case
 /Applications/FreeCAD.app/Contents/Resources/bin/freecadcmd remote_case.py
 ```
 
-It takes a few seconds. It prints a check for each part (valid, one closed solid, size, volume) and checks every pair of parts for overlap. With the board model present it also checks the board against the case and caps. Every line must say `OK`.
+It takes a few seconds. It prints the case size, the case screw length, a check for each part (valid, one closed solid, size, volume) and checks every pair of parts for overlap. With the board model present it also checks the board against the case and caps. Every line must say `OK`.
 
 To render the preview pictures too (takes a few minutes):
 
@@ -53,13 +53,13 @@ PLA or PETG, 0.2 mm layers, 3 walls, 15–20 % infill. A textured PEI plate give
 
 ## Assembly
 
-You need 4× **M3×16** screws (case) and 4× **M3×6** screws (joystick). Both go into printed pilot holes, so self-tapping or ordinary machine screws both work in PLA/PETG. Don't overtighten.
+You need 4× **M3×20** screws (case) and 4× **M3×6** screws (joystick). Both go into printed pilot holes, so self-tapping or ordinary machine screws both work in PLA/PETG. Don't overtighten.
 
 1. **Button caps:** drop the two caps into the button holes from the inside of the front shell, stem first.
 2. **T-Display-S3:** lay it screen-down into the front shell, USB-C towards the opening in the left end. The ribs locate it, and the glass sits against the inside of the front face.
 3. **Joystick:** screw the KY-023 to the four standoffs, stick through the round opening.
-4. **Wiring:** connect the joystick as described in the main README (VRx → GPIO1, VRy → GPIO2, SW → GPIO21, +5V pin → **3V3**, GND → GND).
-5. **Back cover:** fit it so its lip slides inside the front shell walls. Its four posts press the T-Display-S3 against the front. Screw it on with the M3×16 screws.
+4. **Wiring:** plug Dupont jumper wires onto the T-Display-S3's pins (they point towards the back cover) and lead them to the joystick header underneath the joystick board. Connect the joystick as described in the main README (VRx → GPIO1, VRy → GPIO2, SW → GPIO21, +5V pin → **3V3**, GND → GND).
+5. **Back cover:** fit it so its lip slides inside the front shell walls. Its four posts press the T-Display-S3 against the front. Screw it on with the M3×20 screws.
 
 **Buttons:** with USB-C on the left, the two buttons sit left of the screen, one above the other. The **upper** button should be **BOOT** (arm/disarm) and the **lower** one **KEY** (speed gear). Check this on first power-up, since I worked it out from the board model, not a labelled drawing.
 
@@ -71,6 +71,7 @@ The remote firmware turns the screen picture round to match the board's position
 
 - **T-Display-S3:** measured from LilyGo's official STEP model. PCB 60.78 × 25.5 × 1.2 mm; screen glass 49.87 × 25.95 mm, slightly wider than the PCB; both buttons on the screen side next to USB-C; tallest part on the back 3.5 mm.
   - The screen opening (46 × 23.5 mm) is the 1.9" panel's visible area (about 42.6 × 22.7 mm) plus a margin. The model doesn't show exactly where the visible area sits on the glass. If any pixels are hidden behind the frame, increase `win_l` / `win_w`.
+- **Pin headers:** the pin positions come from the board model (two rows of 12 at 2.54 mm, along the long edges). The pin and plug sizes are standard values: 2.5 mm spacer, pins 8.5 mm from the PCB, Dupont housing 14 mm.
 - **KY-023 joystick:** measured by you: PCB 34.0 × 26.0 mm, mounting holes 26.67 × 20.32 mm centre-to-centre.
 
 ### Still to measure on your joystick
@@ -92,7 +93,8 @@ These are typical values that set the case thickness and the size of the joystic
 |---|---|---|
 | `fit` | 0.3 mm | clearance around boards |
 | `wall`, `face`, `floor` | 2.0 mm | wall, front face and back thicknesses |
-| `width`, `height` | 46, 23 mm | case width and thickness. The length follows from the joystick position and header room. |
+| `width` | 46 mm | case width. The length follows from the joystick position and header room. |
+| `td_wire_clear` | 20 mm | free room from the T-Display-S3's PCB back to the inside of the back cover: spacer + Dupont plug + wire bend. **Sets the case thickness.** If you solder wires straight to the pins, about 12 mm is enough and the case gets 8 mm thinner. |
 | `js_x` | 93 mm | joystick centre, measured from the left end |
 | `corner_r`, `edge_r` | 6, 1.2 mm | corner and edge rounding |
 | `win_l`, `win_w` | 46 × 23.5 mm | screen opening |
