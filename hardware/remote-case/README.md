@@ -14,6 +14,8 @@ Outer size: **130 × 46 × 31 mm**. It is that thick because of the T-Display-S3
 | `render.py` | Draws the preview pictures |
 | `out/remote_case_front.stl` | Front shell, full depth: screen window, joystick opening, button holes. Holds both boards. |
 | `out/remote_case_back.stl` | Back cover: a flat plate with a short locating rim and four posts that press the T-Display-S3 against the front. Screws on from behind. |
+| `out/remote_case_back_flat.stl` | Back cover variant: plain screw holes, the outside stays completely flat. For pan- or socket-head screws. |
+| `out/remote_case_back_counterbore.stl` | Back cover variant: cylindrical 1.5 mm recesses for pan- or socket-head screws. **Needs supports.** |
 | `out/remote_button_cap.stl` | Button extension for BOOT and KEY. **Print 2.** |
 | `out/*.step` | The same parts as STEP files, for editing in FreeCAD or other CAD |
 | `ref/t-display-s3-full.stp` | LilyGo's 3D model of the board, used for fit checks. Not in git (see below). |
@@ -47,13 +49,15 @@ Without it, the script still builds the case but skips the board fit checks.
 |---|---|---|
 | Front shell | **front face down** on the plate | No supports needed. The USB-C opening bridges about 13 mm. |
 | Back cover | **outside down** (flat on the plate) | No supports. The rim and posts grow straight up from the plate, and the screw holes are 90° countersinks, which print as 45° slopes. |
+| Back cover, `_flat` | outside down | No supports. |
+| Back cover, `_counterbore` | outside down | **Supports on, "on build plate only"**: the roofs of the four screw-head recesses are flat overhangs. Small tree supports are enough. |
 | Button caps ×2 | foot down, stem up | No supports. Small parts: print them with the shell, or use a brim. |
 
 PLA or PETG, 0.2 mm layers, 3 walls, 15–20 % infill. A textured PEI plate gives the front face a nice finish.
 
 ## Assembly
 
-You need 4× **M3×12 countersunk (flat head)** screws (case; pan-head M3×12 also work, but stick out 2 mm) and 4× **M3×6** screws (joystick). Both go into printed pilot holes, so self-tapping or ordinary machine screws both work in PLA/PETG. Don't overtighten.
+You need 4× **M3×12 countersunk (flat head)** screws (case; pan-head M3×12 also work, but stick out 2 mm). With the `_flat` or `_counterbore` back cover use pan- or socket-head M3×12. and 4× **M3×6** screws (joystick). Both go into printed pilot holes, so self-tapping or ordinary machine screws both work in PLA/PETG. Don't overtighten.
 
 1. **Button caps:** drop the two caps into the button holes from the inside of the front shell, stem first.
 2. **T-Display-S3:** lay it screen-down into the front shell, USB-C towards the opening in the left end. The ribs locate it, and the glass sits against the inside of the front face.

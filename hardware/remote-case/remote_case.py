@@ -117,6 +117,7 @@ P = dict(
     # screws sit flush; pan / socket heads also work.
     screw_len=None,    # case screws, M3; None = shortest that bites >= 8 mm
     screw_cb=3.0,      # skirt: counterbore depth
+    plate_cb=1.5,      # flat, "counterbore" variant: head recess depth in the back plate
     screw_pilot_d=2.6, screw_clear_d=3.4, screw_head_d=6.4,
     boss_d=7.0, back_boss_d=10.0, boss_inset=6.5,
     js_standoff_d=6.0, js_pilot_d=2.6,
@@ -307,8 +308,14 @@ def press_posts():
     return out
 
 
-def back_plate():
+def back_plate(holes="countersink"):
     """Flat plate with a short rim that locates it inside the front shell walls.
+
+    holes: how the screw holes meet the outside of the plate
+      "countersink": 90 deg countersinks, flush flat-head screws, no supports
+      "flat":        plain holes, the outside stays flat (pan / socket heads)
+      "counterbore": cylindrical recesses for pan / socket heads; the recess roof
+                     is a flat overhang, so print it with supports
 
     Printed outside face down: the rim and posts grow straight up from the plate,
     the screw holes are 90 degree countersinks, so nothing needs supports.
@@ -326,6 +333,10 @@ def back_plate():
     csk_h = (screw_head_d - screw_clear_d) / 2           # 90 degree countersink
     for (x, y) in bosses:
         cuts.append(cyl(screw_clear_d, x, y, -1, floor + 1))
+        if holes == "counterbore":
+            cuts.append(cyl(screw_head_d, x, y, -1, plate_cb))
+        if holes != "countersink":
+            continue
         cuts.append(Part.makeCone(screw_head_d / 2 + 0.1, screw_clear_d / 2, csk_h + 0.1,
                                   V(x, y, -0.1)))
     return fuse_cut(shell, cuts)
@@ -465,6 +476,12 @@ def main():
     ok &= check_solid("front", front)
     ok &= check_solid("back", back)
     ok &= check_solid("cap", cap_print)
+    # back plate variants (flat joint only): only the screw holes differ
+    back_variants = {}
+    if joint == "flat":
+        back_variants = {"flat": back_plate("flat"), "counterbore": back_plate("counterbore")}
+        for k, b in back_variants.items():
+            ok &= check_solid(f"back_{k}", b)
 
     print(f"joint: {joint}")
     print(f"case: {length:.1f} x {width:.1f} x {height:.1f} mm, split at Z={split_z:.2f}")
@@ -502,6 +519,10 @@ def main():
                         ("remote_button_cap", cap_print)):
         Mesh.export([_feature(name, shape)], os.path.join(OUT, name + ".stl"))
         shape.exportStep(os.path.join(OUT, name + ".step"))
+    for k, b in back_variants.items():
+        name = f"remote_case_back_{k}"
+        Mesh.export([_feature(name, b)], os.path.join(OUT, name + ".stl"))
+        b.exportStep(os.path.join(OUT, name + ".step"))
 
     # --- previews (slow: set PREVIEW=1 in the environment) ---
     if os.environ.get("PREVIEW") != "1":
@@ -520,6 +541,11 @@ def main():
            views=((35, -60), (-35, -120)), titles=["front", "back"], size=6)
     render([(front, grey)], os.path.join(OUT, "preview_front_inside.png"),
            views=((-60, -75),), titles=["front shell, inside"], size=7)
+    if back_variants:
+        row = [back] + list(back_variants.values())
+        render([(b.translated(V(0, 55 * i, 0)), dark) for i, b in enumerate(row)],
+               os.path.join(OUT, "preview_back_variants.png"), views=((-50, -100),),
+               titles=["back plate outside: countersink / flat / counterbore"], size=7)
     render([(back, dark)], os.path.join(OUT, "preview_back_inside.png"),
            views=((55, -70),), titles=["back cover, inside"], size=7)
     print("ALL SOLIDS OK" if ok else "SOME SOLIDS INVALID")
